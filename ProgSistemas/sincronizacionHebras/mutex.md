@@ -133,3 +133,15 @@ int pthread_cond_signal(pthread_cond_t *restrict cond);//despertará a una hebra
 
 int pthread_cond_broadcast(pthread_cond_t *restrict cond);//despierta a todas la hebras esperando por la condición
 ```
+## Hebras y señales
+Las señales son compartidas por todos las hebras.
+! Entonces si una hebra esta esperando una señal, esta señal podría llegar a otra hebra.
+Para que una hebra no pesque (escuche) una señal, se usa:
+```c pthread_sigmask(...)```
+Y, para que una hebra este esperando a un señal, se hace:
+
+```c
+#include <signal.h>
+int sigwait(const sigset_t * restrict set, int * restrict signop).
+```
+Se muestra un ejemplo en *leakyBucket.c*
