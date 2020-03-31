@@ -53,3 +53,83 @@ Las funciones usadas para estos candados son:
 
 ## Evitar Bloqueos Indefinidos (Deadlock)
 Si varias hebras usan los mismos candados entonces q todas los accedan en el mismo orden. Sino se puede usar ```c tryXXXlock```
+
+## Sincronización por variables de condición
+Se usan cuando un hilo esera a que una variable llegue a algún valor, que supere (o baje de) un umbral o que tome deciciones dependiendo del valor de dicha varible.
+
+La utilizacion de variables de condicion más Mutex permiten esperar por la ocurrencia de una condicón arbitraria.
+
+**La espera por una variable de condición está libre de carreras criticas**
+
+**La idea**:   si la condición no se cumple, en lugar de volver a consultar, quedarse bloqueado hasta que otra hebra nos informe del cambio de la variable y así volver a consultar sólo cuando tenga sentido.
+Las variables de condición son del tipo (de datos) ```c pthread_cond_t```
+
+Al igual que con los mutex se puede inicializar con ```c PTHREAD_COND_INICIALIZER```
+Otra opcion es con:
+Hay que recordar que hay que agregar el include
+```c
+#include <pthread.h>
+```
+Y se pueden usar las funciones:
+```c
+int pthread_cond_signal(pthread_cond_t *restrict cond);
+
+int pthread_cond_broadcast(pthread_cond_t *restrict cond);
+```
+(Donde ambas funciones retornan 0 si esta bien)
+
+Se usa pthread_cond_wait para esperar por un cambio que dé sentido a evaluar nuevamente la condición (tambien se puede hacer asociado a un tiempo de espera) para esto se usan las siguiente funciones:
+```c
+int pthread_cond_wait(pthread_cond_t *restrict cond, pthread_mutex_t *restrict mutex);
+
+int pthread_cond_timewait(pthread_cond_t *restrict cond, pthread_mutex_t *restrict mutex, const struct timespec *restrict timeout);
+```
+Y un ejemplo de esto sería
+Primero, ambas hebras deben tener estas mismas variables (pueden ser globales)
+```c
+pthread_mutex_t    lockDeMiVariable = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t     cambioDeVariable = PTHREAD_COND_INITIALIZER;
+int variable = 0;
+```
+Luego, en la hebra que se va a modiicar la variable se debe contener el código
+```c
+//...
+pthread_ mutex_lock(&lockDeMiVariable);
+variable++;
+pthread_mutex_unlock(&lockDeMiVariable);
+pthread_cond_signal(&cambioDeVariable);//aqui avisa que la variable se modificó
+   //...
+```
+Y, en la hebra que espera por el valor de ```c variable``` se puede tener este código
+```c
+/* Espera por un valor superior a LIMITE en variable para poder proseguir */
+    int espere = 1;
+    while (espere) {  /*Espera por condición */
+        pthread_ mutex_lock(&lock_de_mi_variable);
+        if ( variable > LIMITE)  /* Alcanzó valor límite?*/
+             espere=0;
+        else
+             pthread_cond_wait(&cambioDeVariable,  &lockDeMiVariable); /*espera bloqueada, pero el mutex es liberado y la otra hebra puede modificar "variable"*/
+        pthread_mutex_unlock(&lock_de_mi_variable);
+    }
+/* hago lo que esperaba cuando variable > LIMITE */
+```
+o esta opcion más simple
+```c
+pthread_ mutex_lock(&lockDeMiVariable);
+while ( variable <= LIMITE )  /* Debo seguir esperando mi condición !*/
+    pthread_cond_wait(&cambioDeVariable,  &lockDeMiVariable);/*espera bloqueada*/
+pthread_mutex_unlock(&lockDeMiVariable);
+
+  /* hago lo que esperaba para variable > LIMITE */
+```
+
+## Funciones para notificar a hebras que una condición ha cambiado
+
+Estas funciones son:
+
+```c
+int pthread_cond_signal(pthread_cond_t *restrict cond);//despertará a una hebra que espera con la misma variable de condición
+
+int pthread_cond_broadcast(pthread_cond_t *restrict cond);//despierta a todas la hebras esperando por la condición
+```
